@@ -21,8 +21,6 @@ const Register = () => {
   const router = useRouter();
 
   const onSubmit = async (data: RegisterFormInputs) => {
-    console.log("Form data:", data);
-    console.log("API base URL:", process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api');
     setIsLoading(true);
 
     try {
@@ -52,7 +50,7 @@ const Register = () => {
             message: validationErrors[field][0],
           });
         });
-        toast.error('Please correct the validation errors below.');
+        // toast.error('Please correct the validation errors below.');
       } else {
         toast.error('Registration failed. Please try again.');
       }
