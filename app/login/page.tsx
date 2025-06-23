@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { LoginFormInputs } from "../../types/login";
 import { api } from "../../lib/api";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 
@@ -22,17 +22,18 @@ const Login = () => {
   const onSubmit = async (data: LoginFormInputs) => {
     setIsLoading(true);
     try {
-      const response = await api.post('/login', data);
+      const response = await api.post("/login", data);
       if (response.data && response.data.status === true) {
         // Set authToken cookie
         if (response.data.token) {
-          Cookies.set('authToken', response.data.token, { expires: 7 });
+          localStorage.setItem("token", response.data.token);
+          Cookies.set("authToken", response.data.token, { expires: 7 });
         }
-        toast.success('Login successful! Redirecting to dashboard...', {
+        toast.success("Login successful! Redirecting to dashboard...", {
           duration: 3000,
         });
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push("/dashboard");
         }, 2000);
       } else {
         toast.error(response.data.message);
@@ -48,9 +49,9 @@ const Login = () => {
           });
         });
       } else if (error.response && error.response.status === 401) {
-        toast.error('Invalid credentials.');
+        toast.error("Invalid credentials.");
       } else {
-        toast.error('Something went wrong.');
+        toast.error("Something went wrong.");
       }
     } finally {
       setIsLoading(false);
@@ -75,7 +76,9 @@ const Login = () => {
                 },
               })}
             />
-            {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
+            {errors.email && (
+              <div className="invalid-feedback">{errors.email.message}</div>
+            )}
           </div>
           <div className="mb-3">
             <input
@@ -90,12 +93,22 @@ const Login = () => {
                 },
               })}
             />
-            {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
+            {errors.password && (
+              <div className="invalid-feedback">{errors.password.message}</div>
+            )}
           </div>
-          <button className="btn btn-primary w-100" type="submit" disabled={isLoading}>
+          <button
+            className="btn btn-primary w-100"
+            type="submit"
+            disabled={isLoading}
+          >
             {isLoading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
                 Logging in...
               </>
             ) : (

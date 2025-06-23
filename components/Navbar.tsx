@@ -13,6 +13,7 @@ const Navbar = () => {
 
     const handleLogout = () => {
         Cookies.remove("authToken");
+        localStorage.removeItem("token");
         setIsAuthenticated(false);
         router.push("/login");
     };
