@@ -1,18 +1,23 @@
 "use client";
-import Navbar from "@/components/Navbar";
-import { useRef, useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { Product, ProductFormInputs } from "../../types/product";
-import { api } from "../../lib/api";
-import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
 
-const Dashboard = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+import { useEffect, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { useRouter, useParams } from "next/navigation";
+import { api } from "../../../../lib/api";
+import toast from "react-hot-toast";
+import Navbar from "@/components/Navbar";
+import { ProductFormInputs } from "../../../../types/product";
+
+const EditProduct = () => {
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id;
+  const [product, setProduct] = useState<any>(null);
   const [bannerPreviews, setBannerPreviews] = useState<string[]>([]);
   const [bannerFiles, setBannerFiles] = useState<File[]>([]);
-  const [isProductLoading, setIsProductLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
 
   const {
     register,
@@ -22,55 +27,37 @@ const Dashboard = () => {
     reset,
     formState: { errors },
   } = useForm<ProductFormInputs>();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const router = useRouter();
-
-  // Fetch products from API
-  const fetchProducts = async () => {
-    setIsProductLoading(true);
-    try {
-      // Get token from localStorage
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const response = await api.get('/showproducts', {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      // The response may be paginated, so check for .data or .data.data
-      let productList: Product[] = [];
-      if (Array.isArray(response.data)) {
-        productList = response.data;
-      } else if (Array.isArray(response.data.data)) {
-        productList = response.data.data;
-      } else if (Array.isArray(response.data.products)) {
-        productList = response.data.products;
-      }
-      // Map to include banner as first image if available
-      setProducts(
-        productList.map((p: any) => ({
-          ...p,
-          banner: p.images?.[0]?.image || "#",
-        }))
-      );
-    } catch (error: any) {
-      toast.error("Failed to fetch products.");
-    } finally {
-      setIsProductLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const fetchProduct = async () => {
+      setIsFetching(true);
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const response = await api.get(`/products/${id}/edit`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        setProduct(response.data);
+        reset({
+          title: response.data.title,
+          description: response.data.description,
+          cost: response.data.cost,
+        });
+        setBannerPreviews(response.data.images?.map((img: any) => img.image) || []);
+      } catch (error: any) {
+        toast.error("Failed to fetch product data.");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    if (id) fetchProduct();
+  }, [id, reset]);
 
-  // Helper to update both previews and files when removing an image
   const handleRemoveBannerImage = (idxToRemove: number) => {
     setBannerPreviews((prev) => prev.filter((_, idx) => idx !== idxToRemove));
     setBannerFiles((prev) => prev.filter((_, idx) => idx !== idxToRemove));
-    // Also update the file input's files (not possible directly, so clear and re-add)
     if (fileInputRef.current) {
-      // Create a new DataTransfer to hold the remaining files
       const dt = new DataTransfer();
       bannerFiles.forEach((file, idx) => {
         if (idx !== idxToRemove) {
@@ -84,49 +71,28 @@ const Dashboard = () => {
   const onSubmit = async (data: ProductFormInputs) => {
     setIsLoading(true);
     try {
-      // Use bannerFiles instead of data.banner for upload
-      if (!bannerFiles || bannerFiles.length === 0) {
+      if ((bannerPreviews.length === 0) && (!bannerFiles || bannerFiles.length === 0)) {
         setError("banner", { type: "manual", message: "At least one image is required" });
         setIsLoading(false);
         return;
       }
-      // Prepare FormData for file upload
       const formData = new FormData();
       formData.append("title", data.title);
       formData.append("description", data.description);
       formData.append("cost", String(data.cost));
-      // Append all images
       bannerFiles.forEach((file) => {
         formData.append("images[]", file);
       });
-
-      // Get token from localStorage
+      console.log([...formData.entries()]);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-      const response = await api.post('/products', formData, {
+      await api.post(`/products/${id}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-
-      // Add the new product to the list
-      setProducts((prev) => [
-        ...prev,
-        {
-          id: response.data.product.id,
-          title: response.data.product.title,
-          description: response.data.product.description,
-          cost: response.data.product.cost,
-          banner: response.data.product.images?.[0]?.image || "#",
-        },
-      ]);
-      toast.success("Product added!");
-      reset();
-      setBannerPreviews([]);
-      setBannerFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      fetchProducts(); // Refetch the list to get fresh images
+      toast.success("Product updated!");
+      router.push("/dashboard");
     } catch (error: any) {
       if (error.response && error.response.status === 422) {
         const validationErrors = error.response.data.errors;
@@ -138,21 +104,31 @@ const Dashboard = () => {
         });
         toast.error("Server validation failed.");
       } else {
-        toast.error("Failed to add product. Please try again.");
+        toast.error("Failed to update product. Please try again.");
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isFetching) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
+        <div className="spinner-border text-primary" role="status" aria-label="Loading">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <Navbar />
       <div className="container mt-4">
-        <div className="row">
-          <div className="col-md-6">
+        <div className="row justify-content-center">
+          <div className="col-md-8">
             <div className="card p-4">
-              <h4>Add Product</h4>
+              <h4>Edit Product</h4>
               <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <input
                   className={`form-control mb-2 ${errors.title ? "is-invalid" : ""}`}
@@ -192,12 +168,9 @@ const Dashboard = () => {
                     const files = e.target.files;
                     if (files && files.length > 0) {
                       const previews = Array.from(files).map((file) => URL.createObjectURL(file));
-                      setBannerPreviews(previews);
-                      setBannerFiles(Array.from(files));
+                      setBannerPreviews([...bannerPreviews, ...previews]);
+                      setBannerFiles([...bannerFiles, ...Array.from(files)]);
                       clearErrors("banner");
-                    } else {
-                      setBannerPreviews([]);
-                      setBannerFiles([]);
                     }
                   }}
                   ref={fileInputRef}
@@ -243,58 +216,18 @@ const Dashboard = () => {
                 </div>
 
                 <button className="btn btn-primary" type="submit" disabled={isLoading}>
-                  {isLoading ? "Adding..." : "Add Product"}
+                  {isLoading ? "Updating..." : "Update Product"}
+                </button>
+                <button
+                  className="btn btn-secondary ms-2"
+                  type="button"
+                  onClick={() => router.push("/dashboard")}
+                  disabled={isLoading}
+                >
+                  Cancel
                 </button>
               </form>
             </div>
-          </div>
-          <div className="col-md-6">
-            {isProductLoading ? (
-              <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "200px" }}>
-                <div className="spinner-border text-primary" role="status" aria-label="Loading">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-              </div>
-            ) : (
-              <table className="table table-bordered">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Banner</th>
-                    <th>Cost</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id}>
-                      <td>{product.id}</td>
-                      <td>{product.title}</td>
-                      <td>
-                        <img
-                          src={product.banner}
-                          alt="Product"
-                          style={{ width: "50px", height: "50px", objectFit: "cover" }}
-                        />
-                      </td>
-                      <td>${product.cost}</td>
-                      <td>
-                        <button
-                          className="btn btn-warning btn-sm me-2"
-                          onClick={() => router.push(`/dashboard/edit/${product.id}`)}
-                        >
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" disabled>
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
         </div>
       </div>
@@ -302,4 +235,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default EditProduct; 
