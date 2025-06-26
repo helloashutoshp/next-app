@@ -18,6 +18,7 @@ const EditProduct = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [deletedImages, setDeletedImages] = useState<string[]>([]);
 
   const {
     register,
@@ -55,17 +56,21 @@ const EditProduct = () => {
   }, [id, reset]);
 
   const handleRemoveBannerImage = (idxToRemove: number) => {
-    setBannerPreviews((prev) => prev.filter((_, idx) => idx !== idxToRemove));
-    setBannerFiles((prev) => prev.filter((_, idx) => idx !== idxToRemove));
-    if (fileInputRef.current) {
-      const dt = new DataTransfer();
-      bannerFiles.forEach((file, idx) => {
-        if (idx !== idxToRemove) {
-          dt.items.add(file);
-        }
-      });
-      fileInputRef.current.files = dt.files;
+    // If the image is an existing one (not a new upload)
+    if (bannerPreviews[idxToRemove] && !bannerPreviews[idxToRemove].startsWith("blob:")) {
+      setDeletedImages(prev => [...prev, bannerPreviews[idxToRemove]]);
     }
+    setBannerPreviews(prev => prev.filter((_, idx) => idx !== idxToRemove));
+    setBannerFiles(prev => prev.filter((_, idx) => idx !== idxToRemove));
+    // if (fileInputRef.current) {
+    //   const dt = new DataTransfer();
+    //   bannerFiles.forEach((file, idx) => {
+    //     if (idx !== idxToRemove) {
+    //       dt.items.add(file);
+    //     }
+    //   });
+    //   fileInputRef.current.files = dt.files;
+    // }
   };
 
   const onSubmit = async (data: ProductFormInputs) => {
@@ -83,6 +88,7 @@ const EditProduct = () => {
       bannerFiles.forEach((file) => {
         formData.append("images[]", file);
       });
+      formData.append("deletedImages", JSON.stringify(deletedImages));
       console.log([...formData.entries()]);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       await api.post(`/products/${id}`, formData, {

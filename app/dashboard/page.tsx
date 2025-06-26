@@ -145,6 +145,23 @@ const Dashboard = () => {
     }
   };
 
+  // Delete product handler
+  const handleDelete = async (productId: number) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      await api.delete(`/products/${productId}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      toast.success("Product deleted!");
+      fetchProducts(); // Refresh the list
+    } catch (error) {
+      toast.error("Failed to delete product.");
+    }
+  };
+
   return (
     <div>
       <Navbar />
@@ -286,7 +303,10 @@ const Dashboard = () => {
                         >
                           Edit
                         </button>
-                        <button className="btn btn-danger btn-sm" disabled>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(product.id)}
+                        >
                           Delete
                         </button>
                       </td>
